@@ -24,10 +24,10 @@ from torch.utils.data import DataLoader
 # val_dir_img = 'data/MattingHuman/val/imgs/'
 # val_dir_mask = 'data/MattingHuman/val/masks/'
 
-train_dir_img = 'E:\\motion_deblur\\GOPRO_Large\\train_new\\blur\\'
-train_dir_mask = 'E:\\motion_deblur\\GOPRO_Large\\train_new\\sharp\\'
-val_dir_img = 'E:\\motion_deblur\\GOPRO_Large\\val_new\\blur\\'
-val_dir_mask = 'E:\\motion_deblur\\GOPRO_Large\\val_new\\sharp\\'
+train_dir_img = 'D:\\myprojs\\motion_deblur_dl\\data\\train_new\\blur\\'
+train_dir_mask = 'D:\\myprojs\\motion_deblur_dl\\data\\train_new\\sharp\\'
+val_dir_img = 'D:\\myprojs\\motion_deblur_dl\\data\\val_new\\blur\\'
+val_dir_mask = 'D:\\myprojs\\motion_deblur_dl\\data\\val_new\\sharp\\'
 dir_checkpoint = 'checkpoints/'
 
 
@@ -69,7 +69,8 @@ def train_net(net,
 
     # TODO - Define two losses, binary cross entropy and mean squared error (use pytorch built in functions)
     # bce = nn.BCELoss()
-    mae = nn.L1Loss()
+    # mae = nn.L1Loss()
+    mae = nn.MSELoss()
 
     for epoch in range(epochs):
         net.train()
@@ -87,7 +88,7 @@ def train_net(net,
                 # masks_pred = torch.sigmoid(masks_pred)
 
                 # loss_bce = bce(masks_pred, true_masks)
-                loss = mae(sharp_imgs, sharp_pred)
+                loss = mae(255*sharp_imgs, 255*sharp_pred)
 
                 # TODO - tune the hyperparameters w_1 and w_2
                 # w_1 = 0.6
@@ -104,25 +105,27 @@ def train_net(net,
                 optimizer.zero_grad()
                 loss.backward()
 
-                # nn.utils.clip_grad_value_(net.parameters(), 0.1)
+                nn.utils.clip_grad_value_(net.parameters(), 0.1)
                 optimizer.step()
 
                 pbar.update(blur_imgs.shape[0])
                 global_step += 1
-                if global_step % 2 == 0: #(n_train // (10 * batch_size)) == 0:
+                if global_step % (n_train // (10 * batch_size)) == 0:
                     for tag, value in net.named_parameters():
                         tag = tag.replace('.', '/')
                         writer.add_histogram('weights/' + tag, value.data.cpu().numpy(), global_step)
                         writer.add_histogram('grads/' + tag, value.grad.data.cpu().numpy(), global_step)
 
                     val_score, val_loss = eval_net(net, val_loader, device)
-                    scheduler.step(val_score)
+                    # scheduler.step(val_score)
+
+                    writer.add_scalar('Loss/validation', val_loss, global_step)
+                    writer.add_scalar('Validation Score', val_score, global_step)
+
                     writer.add_scalar('learning_rate', optimizer.param_groups[0]['lr'], global_step)
 
                     logging.info('Validation PSNR: {}, Validation Loss: {}'
                                  .format(val_score, val_loss))
-
-                    # writer.add_scalar('Dice/test', val_score, global_step)
 
                     writer.add_images('blur_images', blur_imgs, global_step)
                     writer.add_images('sharp/true', sharp_imgs, global_step)
@@ -168,9 +171,6 @@ if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     logging.info(f'Using device {device}')
 
-    # n_classes is the number of probabilities you want to get per pixel
-    #   - For 2 classes, use n_classes=1
-    #   - For N > 2 classes, use n_classes=N
     net = TransformerNet()
 
     if args.load:

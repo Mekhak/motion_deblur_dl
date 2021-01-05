@@ -30,10 +30,11 @@ def eval_net(net, loader, device):
             # pred = torch.sigmoid(mask_pred)
             # pred = (pred > 0.5).float()
             tot += Psnr()(sharp_imgs, preds)
-            tot_loss += nn.L1Loss()(sharp_imgs, preds)
+            # tot_loss += nn.L1Loss()(sharp_imgs, preds)
+            tot_loss += nn.MSELoss()(255*sharp_imgs, 255*preds)
 
-            pbar.update()
+            # pbar.update()
 
     net.train()
 
-    return tot / n_val, tot_loss / (n_val // 4)
+    return tot / (n_val), tot_loss / (n_val // 4)

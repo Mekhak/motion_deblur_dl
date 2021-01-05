@@ -72,7 +72,7 @@ class TransformerNet(nn.Module):
 
     def forward(self,
                 input: torch.Tensor) -> torch.Tensor:
-
+        # width and height for initial (256, 256)
         # Shape: (batch_size, 3, 256, 256)
         X = input
 
