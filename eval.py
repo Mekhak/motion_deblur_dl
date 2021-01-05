@@ -14,10 +14,10 @@ from torch import optim
 from tqdm import tqdm
 
 from utils.eval_utils import eval_net
-from models.simple_net import SimpleNet
+from models.transformer_net import TransformerNet
 
-from torch.utils.tensorboard import SummaryWriter
-from dataloaders.matting_human import MattingHuman
+# from torch.utils.tensorboard import SummaryWriter
+from dataloaders.gopro import GoPro
 from torch.utils.data import DataLoader
 
 test_dir_img = 'data/MattingHuman/test/imgs/'
@@ -30,7 +30,7 @@ def best_ckpt(net,
               img_height=448,
               img_width=448):
 
-    test_dataset = MattingHuman(test_dir_img, test_dir_mask, img_height, img_width, False)
+    test_dataset = GoPro(test_dir_img, test_dir_mask, img_height, img_width, False)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True)
     n_test = len(test_dataset)
 
@@ -75,7 +75,7 @@ if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     logging.info(f'Using device {device}')
 
-    net = SimpleNet(n_classes=1)
+    net = TransformerNet()
     net.to(device=device)
 
     try:

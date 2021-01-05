@@ -9,8 +9,8 @@ import torch.nn.functional as F
 from PIL import Image
 from torchvision import transforms
 
-from models.simple_net import SimpleNet
-from dataloaders.matting_human import MattingHuman
+from models.transformer_net import TransformerNet
+from dataloaders.gopro import GoPro
 
 
 def predict_img(net,
@@ -20,7 +20,7 @@ def predict_img(net,
                 img_width=448):
     net.eval()
 
-    img = torch.from_numpy(MattingHuman.preprocess(full_img, img_height, img_width))
+    img = torch.from_numpy(GoPro.preprocess(full_img, img_height, img_width))
 
     img = img.unsqueeze(0)
     img = img.to(device=device, dtype=torch.float32)
@@ -30,13 +30,21 @@ def predict_img(net,
         ##        Example, if the test image has shape (H, W, 3), then we resize it to (1, 3, 448, 448), get the prediction mask (1, 1, 448, 448),
         ##        and before we will return it, we need to resize it to (H, W). 
         ##        Finnaly, probs will be array of shape (H, W), with values from 0 to 1.
-        out = net(img)
-        probs = torch.sigmoid(out)
-        probs = transforms.ToPILImage(probs)
-        probs = transforms.Resize(probs, full_img.size[1]),
-        probs = transforms.ToTensor(probs)
+        # out = net(img)
+        # probs = torch.sigmoid(out)
+        # probs = transforms.ToPILImage(probs)
+        # probs = transforms.Resize(probs, full_img.size[1]),
+        # probs = transforms.ToTensor(probs)
 
-    return probs > 0.5
+        res = net(img).squeeze().cpu()
+        res = res.numpy()
+        res = res.transpose((1, 2, 0))
+        # if max(res) < 1:
+        res *= 255
+        print(res.shape)
+        res = Image.fromarray(np.uint8(res))
+
+    return res
 
 
 def get_args():
@@ -57,14 +65,15 @@ def get_args():
     return parser.parse_args()
 
 
-def mask_to_image(mask):
-    return Image.fromarray((mask * 255).astype(np.uint8))
+# def mask_to_image(mask):
+#     return Image.fromarray((mask * 255).astype(np.uint8))
 
 
 if __name__ == "__main__":
     args = get_args()
-    net = SimpleNet(n_classes=1)
+    net = TransformerNet()
 
+    logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
     logging.info("Loading model {}".format(args.model))
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -72,6 +81,7 @@ if __name__ == "__main__":
     net.to(device=device)
 
     ## TODO - load trained weights
+    net.load_state_dict(torch.load(args.model, map_location=device))
     logging.info("Model loaded !")
 
     if not os.path.exists(args.output):
@@ -80,16 +90,25 @@ if __name__ == "__main__":
 
     imgs = glob(os.path.join(args.input, '*'))
 
+    print(imgs)
+    i = 0
     for pth in imgs:
+        print(pth)
         name = pth.split('/')[-1].split('.')[0]
         logging.info("\nPredicting image {} ...".format(name))
 
         img = Image.open(pth)
+        img_resized = img.resize((args.width, args.height))
+        img_resized.save(args.output + "\\" + str(i) + "_blur.jpg")
 
         mask = predict_img(net=net,
                            full_img=img,
                            img_height=args.height,
                            img_width=args.width,
                            device=device)
-        mask = mask_to_image(mask)
-        mask.save(args.output+name+'.jpg')
+        # mask = mask_to_image(mask)
+        mask.show()
+
+        mask.save(args.output + "\\" + str(i) +'_res.jpg')
+
+        i += 1

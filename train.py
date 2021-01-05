@@ -13,17 +13,23 @@ from torch import optim
 from tqdm import tqdm
 
 from utils.eval_utils import eval_net
-from models.simple_net import SimpleNet
+from models.transformer_net import TransformerNet
 
 from torch.utils.tensorboard import SummaryWriter
-from dataloaders.matting_human import MattingHuman
+from dataloaders.gopro import GoPro
 from torch.utils.data import DataLoader
 
-train_dir_img = 'data/MattingHuman/train/imgs/'
-train_dir_mask = 'data/MattingHuman/train/masks/'
-val_dir_img = 'data/MattingHuman/val/imgs/'
-val_dir_mask = 'data/MattingHuman/val/masks/'
+# train_dir_img = 'data/MattingHuman/train/imgs/'
+# train_dir_mask = 'data/MattingHuman/train/masks/'
+# val_dir_img = 'data/MattingHuman/val/imgs/'
+# val_dir_mask = 'data/MattingHuman/val/masks/'
+
+train_dir_img = 'E:\\motion_deblur\\GOPRO_Large\\train_new\\blur\\'
+train_dir_mask = 'E:\\motion_deblur\\GOPRO_Large\\train_new\\sharp\\'
+val_dir_img = 'E:\\motion_deblur\\GOPRO_Large\\val_new\\blur\\'
+val_dir_mask = 'E:\\motion_deblur\\GOPRO_Large\\val_new\\sharp\\'
 dir_checkpoint = 'checkpoints/'
+
 
 def train_net(net,
               device,
@@ -34,8 +40,8 @@ def train_net(net,
               img_height=448,
               img_width=448):
 
-    train_dataset = MattingHuman(train_dir_img, train_dir_mask, img_height, img_width, True)
-    val_dataset = MattingHuman(val_dir_img, val_dir_mask, img_height, img_width, False)
+    train_dataset = GoPro(train_dir_img, train_dir_mask, img_height, img_width, True)
+    val_dataset = GoPro(val_dir_img, val_dir_mask, img_height, img_width, False)
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True, drop_last=True)
@@ -62,8 +68,8 @@ def train_net(net,
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max', patience=2)
 
     # TODO - Define two losses, binary cross entropy and mean squared error (use pytorch built in functions)
-    bce = nn.BCELoss()
-    mse = nn.MSELoss()
+    # bce = nn.BCELoss()
+    mae = nn.L1Loss()
 
     for epoch in range(epochs):
         net.train()
@@ -71,53 +77,58 @@ def train_net(net,
         epoch_loss = 0
         with tqdm(total=n_train, desc=f'Epoch {epoch + 1}/{epochs}', unit='img') as pbar:
             for batch in train_loader:
-                imgs = batch['image']
-                true_masks = batch['mask']
+                blur_imgs = batch['blur']
+                sharp_imgs = batch['sharp']
 
-                imgs = imgs.to(device=device, dtype=torch.float32)
-                true_masks = true_masks.to(device=device, dtype=torch.float32)
+                blur_imgs = blur_imgs.to(device=device, dtype=torch.float32)
+                sharp_imgs = sharp_imgs.to(device=device, dtype=torch.float32)
 
-                masks_pred = net(imgs)
-                masks_pred = torch.sigmoid(masks_pred)
+                sharp_pred = net(blur_imgs)
+                # masks_pred = torch.sigmoid(masks_pred)
 
-                loss_bce = bce(masks_pred, true_masks)
-                loss_mse = mse(masks_pred, true_masks)
+                # loss_bce = bce(masks_pred, true_masks)
+                loss = mae(sharp_imgs, sharp_pred)
 
                 # TODO - tune the hyperparameters w_1 and w_2
-                w_1 = 0.6
-                w_2 = 0.4
-                loss = w_1*loss_bce + w_2*loss_mse
+                # w_1 = 0.6
+                # w_2 = 0.4
+                # loss = w_1*loss_bce + w_2*loss_mse
 
                 epoch_loss += loss.item()
 
                 writer.add_scalar('Loss/train', loss.item(), global_step)
-                writer.add_scalar('Loss/train/bce', loss_bce.item(), global_step)
-                writer.add_scalar('Loss/train/mse', loss_mse.item(), global_step)
+                # writer.add_scalar('Loss/train/bce', loss_bce.item(), global_step)
+                # writer.add_scalar('Loss/train/mse', loss_mse.item(), global_step)
                 pbar.set_postfix(**{'loss (batch)': loss.item()})
 
                 optimizer.zero_grad()
                 loss.backward()
 
-                nn.utils.clip_grad_value_(net.parameters(), 0.1)
+                # nn.utils.clip_grad_value_(net.parameters(), 0.1)
                 optimizer.step()
 
-                pbar.update(imgs.shape[0])
+                pbar.update(blur_imgs.shape[0])
                 global_step += 1
-                if global_step % (n_train // (10 * batch_size)) == 0:
+                if global_step % 2 == 0: #(n_train // (10 * batch_size)) == 0:
                     for tag, value in net.named_parameters():
                         tag = tag.replace('.', '/')
                         writer.add_histogram('weights/' + tag, value.data.cpu().numpy(), global_step)
                         writer.add_histogram('grads/' + tag, value.grad.data.cpu().numpy(), global_step)
-                    val_score = eval_net(net, val_loader, device)
+
+                    val_score, val_loss = eval_net(net, val_loader, device)
                     scheduler.step(val_score)
                     writer.add_scalar('learning_rate', optimizer.param_groups[0]['lr'], global_step)
 
-                    logging.info('Validation Dice Coeff: {}'.format(val_score))
-                    writer.add_scalar('Dice/test', val_score, global_step)
+                    logging.info('Validation PSNR: {}, Validation Loss: {}'
+                                 .format(val_score, val_loss))
 
-                    writer.add_images('images', imgs, global_step)
-                    writer.add_images('masks/true', true_masks, global_step)
-                    writer.add_images('masks/pred', masks_pred > 0.5, global_step)
+                    # writer.add_scalar('Dice/test', val_score, global_step)
+
+                    writer.add_images('blur_images', blur_imgs, global_step)
+                    writer.add_images('sharp/true', sharp_imgs, global_step)
+                    writer.add_images('sharp/pred', sharp_pred, global_step)
+
+        logging.info('Epoch MAE loss: {}'.format(epoch_loss / (n_train // batch_size)))
 
         if save_cp:
             try:
@@ -160,7 +171,7 @@ if __name__ == '__main__':
     # n_classes is the number of probabilities you want to get per pixel
     #   - For 2 classes, use n_classes=1
     #   - For N > 2 classes, use n_classes=N
-    net = SimpleNet(n_classes=1)
+    net = TransformerNet()
 
     if args.load:
         net.load_state_dict(
