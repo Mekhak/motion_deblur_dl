@@ -10,6 +10,7 @@ from PIL import Image
 from torchvision import transforms
 
 from models.transformer_net import TransformerNet
+from models.ResnetDecoder import SimpleNet, Test
 from dataloaders.gopro import GoPro
 
 
@@ -57,9 +58,9 @@ def get_args():
                         help='Directory name of input images', required=True)
     parser.add_argument('--output', '-o',
                         help='Derectory where outputs will be saved', required=True)
-    parser.add_argument('-hh', '--height', dest='height', type=int, default=448,
+    parser.add_argument('-hh', '--height', dest='height', type=int, default=480,
                         help='Height of images')
-    parser.add_argument('-ww', '--width', dest='width', type=int, default=448,
+    parser.add_argument('-ww', '--width', dest='width', type=int, default=640,
                         help='Width of images')
 
     return parser.parse_args()
@@ -71,7 +72,9 @@ def get_args():
 
 if __name__ == "__main__":
     args = get_args()
-    net = TransformerNet()
+    # net = TransformerNet()
+    net = SimpleNet()
+    # net = Test()
 
     logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
     logging.info("Loading model {}".format(args.model))

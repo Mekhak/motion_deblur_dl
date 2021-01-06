@@ -31,10 +31,18 @@ def eval_net(net, loader, device):
             # pred = (pred > 0.5).float()
             tot += Psnr()(sharp_imgs, preds)
             # tot_loss += nn.L1Loss()(sharp_imgs, preds)
-            tot_loss += nn.MSELoss()(255*sharp_imgs, 255*preds)
+            tot_loss += nn.MSELoss()(sharp_imgs, preds)
 
             # pbar.update()
 
     net.train()
 
-    return tot / (n_val), tot_loss / (n_val // 4)
+    # print()
+    # print("n_val: ", n_val)
+    # print("batch_size: ", batch_size)
+    # print("tot_loss: ", tot_loss)
+    # print("n_val // batch_size: ", n_val // batch_size)
+    # print("tot_loss / (n_val // batch_size): ", tot_loss / (n_val // batch_size))
+    # print()
+
+    return tot / n_val, tot_loss / n_val

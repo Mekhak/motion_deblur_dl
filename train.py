@@ -14,6 +14,9 @@ from tqdm import tqdm
 
 from utils.eval_utils import eval_net
 from models.transformer_net import TransformerNet
+from models.transformer_net_levon import TransformerNetLevon
+from models.ResnetDecoder import SimpleNet, Test
+
 
 from torch.utils.tensorboard import SummaryWriter
 from dataloaders.gopro import GoPro
@@ -28,6 +31,12 @@ train_dir_img = 'D:\\myprojs\\motion_deblur_dl\\data\\train_new\\blur\\'
 train_dir_mask = 'D:\\myprojs\\motion_deblur_dl\\data\\train_new\\sharp\\'
 val_dir_img = 'D:\\myprojs\\motion_deblur_dl\\data\\val_new\\blur\\'
 val_dir_mask = 'D:\\myprojs\\motion_deblur_dl\\data\\val_new\\sharp\\'
+
+# train_dir_img  = 'D:\\myprojs\\motion_deblur_dl\\data\\train_overfit\\blur\\'
+# train_dir_mask = 'D:\\myprojs\\motion_deblur_dl\\data\\train_overfit\\blur\\'
+# val_dir_img    = 'D:\\myprojs\\motion_deblur_dl\\data\\train_overfit\\blur\\'
+# val_dir_mask   = 'D:\\myprojs\\motion_deblur_dl\\data\\train_overfit\\blur\\'
+
 dir_checkpoint = 'checkpoints/'
 
 
@@ -64,13 +73,13 @@ def train_net(net,
         Images width:    {img_width}
     ''')
 
-    optimizer = optim.RMSprop(net.parameters(), lr=lr, weight_decay=1e-8, momentum=0.9)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max', patience=2)
+    # optimizer = optim.RMSprop(net.parameters(), lr=lr, weight_decay=1e-8, momentum=0.9)
+    optimizer = optim.Adam(net.parameters(), lr=lr)
+    # optimizer = optim.SGD(net.parameters(), lr=lr)
+    # scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max', patience=2)
 
-    # TODO - Define two losses, binary cross entropy and mean squared error (use pytorch built in functions)
-    # bce = nn.BCELoss()
-    # mae = nn.L1Loss()
     mae = nn.MSELoss()
+    # mae = nn.L1Loss()
 
     for epoch in range(epochs):
         net.train()
@@ -85,32 +94,28 @@ def train_net(net,
                 sharp_imgs = sharp_imgs.to(device=device, dtype=torch.float32)
 
                 sharp_pred = net(blur_imgs)
-                # masks_pred = torch.sigmoid(masks_pred)
 
-                # loss_bce = bce(masks_pred, true_masks)
-                loss = mae(255*sharp_imgs, 255*sharp_pred)
-
-                # TODO - tune the hyperparameters w_1 and w_2
-                # w_1 = 0.6
-                # w_2 = 0.4
-                # loss = w_1*loss_bce + w_2*loss_mse
+                loss = mae(sharp_imgs, sharp_pred)
+                # loss = mae(sharp_imgs, sharp_imgs)
 
                 epoch_loss += loss.item()
 
                 writer.add_scalar('Loss/train', loss.item(), global_step)
-                # writer.add_scalar('Loss/train/bce', loss_bce.item(), global_step)
-                # writer.add_scalar('Loss/train/mse', loss_mse.item(), global_step)
                 pbar.set_postfix(**{'loss (batch)': loss.item()})
 
                 optimizer.zero_grad()
                 loss.backward()
 
-                nn.utils.clip_grad_value_(net.parameters(), 0.1)
+                # nn.utils.clip_grad_value_(net.parameters(), 0.1)
                 optimizer.step()
 
                 pbar.update(blur_imgs.shape[0])
                 global_step += 1
-                if global_step % (n_train // (10 * batch_size)) == 0:
+
+                # if global_step % (n_train // (10 * batch_size)) == 0:
+                if global_step % (n_train // (batch_size)) == 0:
+                # if global_step % n_train == 0:
+                # if False:
                     for tag, value in net.named_parameters():
                         tag = tag.replace('.', '/')
                         writer.add_histogram('weights/' + tag, value.data.cpu().numpy(), global_step)
@@ -120,7 +125,7 @@ def train_net(net,
                     # scheduler.step(val_score)
 
                     writer.add_scalar('Loss/validation', val_loss, global_step)
-                    writer.add_scalar('Validation Score', val_score, global_step)
+                    writer.add_scalar('Validation_Score', val_score, global_step)
 
                     writer.add_scalar('learning_rate', optimizer.param_groups[0]['lr'], global_step)
 
@@ -131,7 +136,7 @@ def train_net(net,
                     writer.add_images('sharp/true', sharp_imgs, global_step)
                     writer.add_images('sharp/pred', sharp_pred, global_step)
 
-        logging.info('Epoch MAE loss: {}'.format(epoch_loss / (n_train // batch_size)))
+        logging.info('Epoch MAE loss: {}'.format(epoch_loss / len(train_loader)))
 
         if save_cp:
             try:
@@ -157,9 +162,9 @@ def get_args():
                         help='Learning rate', dest='lr')
     parser.add_argument('-f', '--load', dest='load', type=str, default=False,
                         help='Load model from a .pth file')
-    parser.add_argument('-hh', '--height', dest='height', type=int, default=448,
+    parser.add_argument('-hh', '--height', dest='height', type=int, default=480,
                         help='Height of training images')
-    parser.add_argument('-ww', '--width', dest='width', type=int, default=448,
+    parser.add_argument('-ww', '--width', dest='width', type=int, default=640,
                         help='Width of training images')
 
     return parser.parse_args()
@@ -171,7 +176,8 @@ if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     logging.info(f'Using device {device}')
 
-    net = TransformerNet()
+    net = SimpleNet()
+    # net = Test()
 
     if args.load:
         net.load_state_dict(
