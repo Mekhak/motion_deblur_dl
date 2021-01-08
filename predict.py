@@ -5,12 +5,10 @@ from glob import glob
 
 import numpy as np
 import torch
-import torch.nn.functional as F
 from PIL import Image
-from torchvision import transforms
 
 from models.transformer_net import TransformerNet
-from models.ResnetDecoder import SimpleNet, Test
+from models.resnet_decoder import ResnetEncDec
 from dataloaders.gopro import GoPro
 
 
@@ -27,22 +25,12 @@ def predict_img(net,
     img = img.to(device=device, dtype=torch.float32)
 
     with torch.no_grad():
-        ## TODO - get the prediction mask, and resize it to the shape of initial image.
-        ##        Example, if the test image has shape (H, W, 3), then we resize it to (1, 3, 448, 448), get the prediction mask (1, 1, 448, 448),
-        ##        and before we will return it, we need to resize it to (H, W). 
-        ##        Finnaly, probs will be array of shape (H, W), with values from 0 to 1.
-        # out = net(img)
-        # probs = torch.sigmoid(out)
-        # probs = transforms.ToPILImage(probs)
-        # probs = transforms.Resize(probs, full_img.size[1]),
-        # probs = transforms.ToTensor(probs)
-
         res = net(img).squeeze().cpu()
         res = res.numpy()
         res = res.transpose((1, 2, 0))
-        # if max(res) < 1:
-        res *= 255
         print(res.shape)
+
+        res *= 255
         res = Image.fromarray(np.uint8(res))
 
     return res
@@ -66,15 +54,10 @@ def get_args():
     return parser.parse_args()
 
 
-# def mask_to_image(mask):
-#     return Image.fromarray((mask * 255).astype(np.uint8))
-
-
 if __name__ == "__main__":
     args = get_args()
     # net = TransformerNet()
-    net = SimpleNet()
-    # net = Test()
+    net = ResnetEncDec()
 
     logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
     logging.info("Loading model {}".format(args.model))
@@ -83,7 +66,6 @@ if __name__ == "__main__":
     logging.info(f'Using device {device}')
     net.to(device=device)
 
-    ## TODO - load trained weights
     net.load_state_dict(torch.load(args.model, map_location=device))
     logging.info("Model loaded !")
 
@@ -94,6 +76,7 @@ if __name__ == "__main__":
     imgs = glob(os.path.join(args.input, '*'))
 
     print(imgs)
+
     i = 0
     for pth in imgs:
         print(pth)
@@ -109,7 +92,7 @@ if __name__ == "__main__":
                            img_height=args.height,
                            img_width=args.width,
                            device=device)
-        # mask = mask_to_image(mask)
+
         mask.show()
 
         mask.save(args.output + "\\" + str(i) +'_res.jpg')

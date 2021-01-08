@@ -7,22 +7,18 @@ import os
 import sys
 from glob import glob
 
-import numpy as np
 import torch
-import torch.nn as nn
-from torch import optim
-from tqdm import tqdm
 
 from utils.eval_utils import eval_net
 from models.transformer_net import TransformerNet
+from models.resnet_decoder import ResnetEncDec
 
-# from torch.utils.tensorboard import SummaryWriter
 from dataloaders.gopro import GoPro
 from torch.utils.data import DataLoader
 
-test_dir_img = 'data/MattingHuman/test/imgs/'
-test_dir_mask = 'data/MattingHuman/test/masks/'
-dir_checkpoint = 'checkpoints/'
+test_dir_img = 'D:\\myprojs\\motion_deblur_dl\\data\\test_new\\blur\\'
+test_dir_mask = 'D:\\myprojs\\motion_deblur_dl\\data\\test_new\\sharp\\'
+dir_checkpoint = 'checkpoints_test/'
 
 def best_ckpt(net,
               device,
@@ -34,7 +30,7 @@ def best_ckpt(net,
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=8, pin_memory=True)
     n_test = len(test_dataset)
 
-    ckpts = glob(os.path.join('checkpoints/', '*'))
+    ckpts = glob(os.path.join(dir_checkpoint, '*'))
     ckpts.sort(key=lambda item: (len(item), item))
 
     n_ckpt = len(ckpts)
@@ -50,10 +46,16 @@ def best_ckpt(net,
 
     for ckpt in ckpts:
         name = ckpt.split('/')[-1]
-        ## TODO - load trained weights from checkpoint and evaluate model on test set.
-        net.load_state_dict(torch.load(ckpt), strict=False)
-        score = eval_net(net, test_loader, device)
-        logging.info('Dice Coeff for {} : {}'.format(name, score))
+
+        net.load_state_dict(
+            torch.load(ckpt, map_location=device)
+        )
+        logging.info(f'Model loaded from {ckpt}')
+
+        score, loss = eval_net(net, test_loader, device)
+
+        logging.info('PSNR for {} : {}'.format(name, score))
+        logging.info('MSE  for {} : {}'.format(name, loss))
 
 
 def get_args():
@@ -61,9 +63,9 @@ def get_args():
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('-b', '--batch-size', metavar='B', type=int, nargs='?', default=16,
                         help='Batch size', dest='batchsize')
-    parser.add_argument('-hh', '--height', dest='height', type=int, default=448,
+    parser.add_argument('-hh', '--height', dest='height', type=int, default=256,
                         help='Height of training images')
-    parser.add_argument('-ww', '--width', dest='width', type=int, default=448,
+    parser.add_argument('-ww', '--width', dest='width', type=int, default=256,
                         help='Width of training images')
 
     return parser.parse_args()
@@ -75,7 +77,7 @@ if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     logging.info(f'Using device {device}')
 
-    net = TransformerNet()
+    net = ResnetEncDec()
     net.to(device=device)
 
     try:

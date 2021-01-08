@@ -14,29 +14,16 @@ from tqdm import tqdm
 
 from utils.eval_utils import eval_net
 from models.transformer_net import TransformerNet
-from models.transformer_net_levon import TransformerNetLevon
-from models.ResnetDecoder import SimpleNet, Test
-
+from models.resnet_decoder import ResnetEncDec
 
 from torch.utils.tensorboard import SummaryWriter
 from dataloaders.gopro import GoPro
 from torch.utils.data import DataLoader
 
-# train_dir_img = 'data/MattingHuman/train/imgs/'
-# train_dir_mask = 'data/MattingHuman/train/masks/'
-# val_dir_img = 'data/MattingHuman/val/imgs/'
-# val_dir_mask = 'data/MattingHuman/val/masks/'
-
 train_dir_img = 'D:\\myprojs\\motion_deblur_dl\\data\\train_new\\blur\\'
 train_dir_mask = 'D:\\myprojs\\motion_deblur_dl\\data\\train_new\\sharp\\'
 val_dir_img = 'D:\\myprojs\\motion_deblur_dl\\data\\val_new\\blur\\'
 val_dir_mask = 'D:\\myprojs\\motion_deblur_dl\\data\\val_new\\sharp\\'
-
-# train_dir_img  = 'D:\\myprojs\\motion_deblur_dl\\data\\train_overfit\\blur\\'
-# train_dir_mask = 'D:\\myprojs\\motion_deblur_dl\\data\\train_overfit\\blur\\'
-# val_dir_img    = 'D:\\myprojs\\motion_deblur_dl\\data\\train_overfit\\blur\\'
-# val_dir_mask   = 'D:\\myprojs\\motion_deblur_dl\\data\\train_overfit\\blur\\'
-
 dir_checkpoint = 'checkpoints/'
 
 
@@ -96,7 +83,6 @@ def train_net(net,
                 sharp_pred = net(blur_imgs)
 
                 loss = mae(sharp_imgs, sharp_pred)
-                # loss = mae(sharp_imgs, sharp_imgs)
 
                 epoch_loss += loss.item()
 
@@ -112,10 +98,7 @@ def train_net(net,
                 pbar.update(blur_imgs.shape[0])
                 global_step += 1
 
-                # if global_step % (n_train // (10 * batch_size)) == 0:
                 if global_step % (n_train // (batch_size)) == 0:
-                # if global_step % n_train == 0:
-                # if False:
                     for tag, value in net.named_parameters():
                         tag = tag.replace('.', '/')
                         writer.add_histogram('weights/' + tag, value.data.cpu().numpy(), global_step)
@@ -176,8 +159,7 @@ if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     logging.info(f'Using device {device}')
 
-    net = SimpleNet()
-    # net = Test()
+    net = ResnetEncDec()
 
     if args.load:
         net.load_state_dict(

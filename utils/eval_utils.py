@@ -27,8 +27,6 @@ def eval_net(net, loader, device):
             with torch.no_grad():
                 preds = net(blur_imgs)
 
-            # pred = torch.sigmoid(mask_pred)
-            # pred = (pred > 0.5).float()
             tot += Psnr()(sharp_imgs, preds)
             # tot_loss += nn.L1Loss()(sharp_imgs, preds)
             tot_loss += nn.MSELoss()(sharp_imgs, preds)

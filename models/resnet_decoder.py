@@ -4,22 +4,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-class Test(nn.Module):
-    def __init__(self):
-        super(Test, self).__init__()
-        self.conv1 = nn.Conv2d(3, 3, (3, 3), bias=False, padding=1)
-        self.conv2 = nn.Conv2d(3, 3, (3, 3), bias=False, padding=1)
-        self.conv3 = nn.Conv2d(3, 3, (3, 3), bias=False, padding=1)
-        self.conv4 = nn.Conv2d(3, 3, (3, 3), bias=False, padding=1)
-
-    def forward(self, input):
-        y = self.conv1(input)
-        y = self.conv2(y)
-        y = self.conv3(y)
-        y = self.conv4(y)
-
-        # print("output shape: ", y.shape)
-        return y
 
 ## ResNet-50 definition
 class Bottleneck(nn.Module):
@@ -152,9 +136,9 @@ class OutConv(nn.Module):
         return self.conv(x)
 
 
-class SimpleNet(nn.Module):
+class ResnetEncDec(nn.Module):
     def __init__(self, n_classes=3):
-        super(SimpleNet, self).__init__()
+        super(ResnetEncDec, self).__init__()
         self.n_classes = n_classes
 
         self.bkbone = ResNet()

@@ -34,9 +34,6 @@ class GoPro(Dataset):
         # pil_img.show()
         img_nd = np.array(pil_img)
 
-        # if len(img_nd.shape) == 2:
-        #     img_nd = np.expand_dims(img_nd, axis=2)
-
         # HWC to CHW
         img_trans = img_nd.transpose((2, 0, 1))
         if img_trans.max() > 1:
@@ -66,16 +63,12 @@ class GoPro(Dataset):
             f'but are {blur.size} and {sharp.size}'
 
         # if self.is_for_train:
-        #     # TODO - make some real-time augmentations
+        #     # some real-time augmentations
         #     img =
         #     mask =
 
         blur = self.preprocess(blur, self.image_height, self.image_width)
         sharp = self.preprocess(sharp, self.image_height, self.image_width)
-
-        # if not self.is_for_train:
-        #     mask[mask > 0.5] = 1
-            # mask[mask < 0.5] = 0
 
         return {
             'blur': torch.from_numpy(blur).type(torch.FloatTensor),
