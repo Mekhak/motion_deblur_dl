@@ -173,7 +173,7 @@ class SimpleNet(nn.Module):
         x = self.up3(x, out2)
         x = self.up4(x)
         x = self.up5(x)
-        logits = self.outc(x)
+        out = F.sigmoid(self.outc(x))
 
         # print("output shape: ", logits.shape)
-        return logits
+        return out
