@@ -66,8 +66,7 @@ class TransformerNet(nn.Module):
         self.conv5 = nn.ConvTranspose2d(64, 32, kernel_size=(3, 3), stride=2, padding=1, output_padding=1, bias=False)
         self.bn5   = nn.BatchNorm2d(32)
 
-        self.conv6 = nn.Conv2d(32, 3, kernel_size=(9, 9), stride=1, padding=4, bias=False)
-        self.bn6   = nn.BatchNorm2d(3)
+        self.conv6 = nn.Conv2d(32, 3, kernel_size=(9, 9), stride=1, padding=4, bias=True)
 
 
     def forward(self,
@@ -108,7 +107,6 @@ class TransformerNet(nn.Module):
 
         # Shape: (batch_size, 3, 256, 256)
         X = self.conv6(X)
-        X = self.bn6(X)
-        X = self.activation(X)
+        X = nn.functional.sigmoid(X)
 
         return X
